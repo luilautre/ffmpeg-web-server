@@ -1,5 +1,4 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { toBlobURL } from "@ffmpeg/util";
 import "./style.css";
 
 const $ = (s) => document.querySelector(s);
@@ -26,12 +25,14 @@ async function loadEngine() {
   ffmpeg.on("progress", ({ progress: p }) => {
     if (Number.isFinite(p)) progress(8 + p * 86, "Conversion en cours…");
   });
-  const base = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
-  const [coreURL, wasmURL] = await Promise.all([
-    toBlobURL(base + "/ffmpeg-core.js", "text/javascript"),
-    toBlobURL(base + "/ffmpeg-core.wasm", "application/wasm")
-  ]);
-  await ffmpeg.load({ coreURL, wasmURL });
+  // Utiliser la version ESM : le worker FFmpeg peut importer le module
+  // directement depuis le CDN. Les URL blob provoquaient l'erreur
+  // "failed to import ffmpeg-core.js" dans certains navigateurs.
+  const base = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm";
+  await ffmpeg.load({
+    coreURL: base + "/ffmpeg-core.js",
+    wasmURL: base + "/ffmpeg-core.wasm"
+  });
 }
 
 async function playlistSegments(url, depth = 0) {
