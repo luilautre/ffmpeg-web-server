@@ -1,32 +1,19 @@
 # FFmpeg Web Converter
 
-## Prérequis
-- Node.js 18 ou plus récent
-- FFmpeg installé et accessible dans le PATH
+Application Vite statique : Vercel héberge l'interface et FFmpeg.wasm convertit directement dans le navigateur. Aucun serveur Node permanent ni processus FFmpeg côté Vercel.
 
-## Ubuntu / Debian
-```bash
-sudo apt update
-sudo apt install ffmpeg
-```
+## Déploiement
+Vercel : commande `npm run build`, dossier de sortie `dist`.
 
-## Windows
-Installe FFmpeg et ajoute son dossier `bin` au PATH. Vérifie dans un terminal :
-```powershell
-ffmpeg -version
-node --version
-```
+## Fonctions
+- Convertit les fichiers locaux en MP4.
+- Accepte les URL vidéo et les playlists HLS MPEG-TS.
+- Remux sans réencodage lorsque les codecs sont compatibles.
 
-## Démarrer
-Dans le dossier du projet :
-```bash
-npm start
-```
-Puis ouvre http://127.0.0.1:3000
+## Limites
+- Les URL distantes doivent autoriser CORS depuis le domaine du site.
+- HLS chiffré/DRM et HLS fMP4 ne sont pas pris en charge.
+- Traitement en mémoire : les gros fichiers peuvent dépasser les limites du navigateur.
+- Le moteur FFmpeg (~30 Mo) est chargé depuis jsDelivr au premier lancement.
 
-Aucune dépendance npm externe n'est nécessaire.
-
-Les MP4 générés sont enregistrés dans `downloads/`.
-Le serveur écoute uniquement sur 127.0.0.1 : il n'est pas exposé sur le réseau.
-Utilise uniquement des flux que tu es autorisé à télécharger. Aucun contournement DRM n'est fourni.
-# ffmpeg-web-server
+Utilise uniquement des contenus que tu es autorisé à télécharger.
