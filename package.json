@@ -1,0 +1,9 @@
+{
+  "name": "ffmpeg-web-converter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interface web locale pour convertir des flux avec FFmpeg",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
