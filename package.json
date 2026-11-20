@@ -1,9 +1,18 @@
 {
   "name": "ffmpeg-web-converter",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Interface web locale pour convertir des flux avec FFmpeg",
+  "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ffmpeg/ffmpeg": "0.12.10",
+    "@ffmpeg/util": "0.12.2"
+  },
+  "devDependencies": {
+    "vite": "6.4.1"
   }
 }
