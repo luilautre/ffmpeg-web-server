@@ -17,6 +17,15 @@
       <div class="or"><span>OU</span></div>
       <label class="file-pick" for="sourceFile"><strong>Choisir un fichier vidéo</strong><span id="fileName">MP4, TS, MOV, WebM…</span></label>
       <input id="sourceFile" type="file" accept="video/*,.ts,.mkv,.avi,.mov,.mp4,.webm" hidden>
+      <label class="field-label settings-label" for="parallelSelect">Téléchargements HLS simultanés</label>
+      <select id="parallelSelect">
+        <option value="5">5 segments</option>
+        <option value="10">10 segments</option>
+        <option value="15">15 segments</option>
+        <option value="20">20 segments</option>
+        <option value="30" selected>30 segments</option>
+      </select>
+      <small class="setting-help">Chaque segment dispose de 2 tentatives de téléchargement.</small>
       <button id="convertBtn" type="button">Charger FFmpeg et convertir</button>
     </section>
     <section class="progress-wrap">
