@@ -5,7 +5,7 @@ const $ = (s) => document.querySelector(s);
 const urlInput = $("#sourceUrl"), fileInput = $("#sourceFile");
 const button = $("#convertBtn"), status = $("#status"), percent = $("#percent");
 const bar = $("#bar"), details = $("#details"), download = $("#download");
-let ffmpeg, outputUrl, videoDuration = 0;
+let ffmpeg, outputUrl, videoDuration = 0, debugLines = [];
 
 fileInput.addEventListener("change", () => {
   $("#fileName").textContent = fileInput.files[0]?.name || "MP4, TS, MOV, WebM…";
@@ -16,10 +16,19 @@ function progress(value, message) {
   if (message) status.textContent = message;
 }
 function cleanName(name) { return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "input.bin"; }
+function debug(message, data) {
+  const stamp = new Date().toLocaleTimeString("fr-FR", { hour12: false });
+  const extra = data === undefined ? "" : " " + (typeof data === "string" ? data : JSON.stringify(data));
+  debugLines.push("[" + stamp + "] " + message + extra);
+  if (debugLines.length > 120) debugLines.shift();
+  details.textContent = debugLines.join("\n");
+  details.scrollTop = details.scrollHeight;
+}
 
 async function loadEngine() {
   if (ffmpeg) return;
   status.textContent = "Chargement de FFmpeg (~30 Mo)…";
+  debug("FFmpeg: chargement demandé");
   ffmpeg = new FFmpeg();
   const toSeconds = (value) => {
     const match = value.match(/^(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/);
@@ -32,12 +41,14 @@ async function loadEngine() {
     // FFmpeg indique la durée totale dans les informations d'entrée,
     // puis le temps média traité dans ses lignes de progression.
     const durationMatch = message.match(/Duration:\s*(\d+:\d{2}:\d{2}(?:\.\d+)?)/);
-    if (durationMatch) videoDuration = toSeconds(durationMatch[1]);
+    if (durationMatch) { videoDuration = toSeconds(durationMatch[1]); debug("Durée détectée", { raw: durationMatch[1], seconds: videoDuration }); }
 
     const timeMatch = message.match(/time=(\d+:\d{2}:\d{2}(?:\.\d+)?)/);
     if (timeMatch && videoDuration > 0) {
       const convertedSeconds = toSeconds(timeMatch[1]);
-      progress(Math.min(99, convertedSeconds / videoDuration * 100), "Conversion en cours…");
+      const pct = Math.min(99, convertedSeconds / videoDuration * 100);
+      progress(pct, "Conversion en cours…");
+      debug("Progression calculée", { converted: timeMatch[1], duration: videoDuration, percent: Number(pct.toFixed(2)) });
     }
   });
   // Utiliser la version ESM : le worker FFmpeg peut importer le module
@@ -48,12 +59,15 @@ async function loadEngine() {
     coreURL: base + "/ffmpeg-core.js",
     wasmURL: base + "/ffmpeg-core.wasm"
   });
+  debug("FFmpeg: prêt");
 }
 
 async function playlistSegments(url, depth = 0) {
   if (depth > 4) throw new Error("Trop de niveaux de playlists HLS.");
+  debug("Lecture playlist HLS", { depth, url });
   const response = await fetch(url);
   if (!response.ok) throw new Error("Playlist inaccessible : HTTP " + response.status);
+  debug("Playlist HTTP", response.status);
   const text = await response.text();
   if (!text.trimStart().startsWith("#EXTM3U")) throw new Error("L'URL ne renvoie pas une playlist M3U8.");
   const lines = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
@@ -79,17 +93,20 @@ async function playlistSegments(url, depth = 0) {
     const match = line.match(/^#EXTINF:([0-9]+(?:\.[0-9]+)?)/);
     return total + (match ? Number(match[1]) : 0);
   }, 0);
+  debug("Playlist analysée", { segments: segments.length, durationSeconds: duration });
   return { segments, duration };
 }
 
 async function run() {
-  button.disabled = true; download.hidden = true; details.textContent = "";
+  button.disabled = true; download.hidden = true; details.textContent = ""; debugLines = [];
+  debug("Début conversion", { url: urlInput.value.trim(), file: fileInput.files[0]?.name || null, parallel: $("#parallelSelect")?.value });
   if (outputUrl) URL.revokeObjectURL(outputUrl);
   progress(0, "Préparation…");
   try {
     const file = fileInput.files[0];
     const rawUrl = urlInput.value.trim();
     if (!file && !rawUrl) throw new Error("Colle une URL ou sélectionne un fichier vidéo.");
+    debug("Entrée validée", { type: file ? "fichier local" : "URL" });
     await loadEngine();
     let inputArgs;
     if (file) {
@@ -103,6 +120,7 @@ async function run() {
         const playlist = await playlistSegments(url.href);
         const segments = playlist.segments;
         videoDuration = playlist.duration;
+        debug("Durée HLS retenue", { seconds: videoDuration, segments: segments.length });
         const concat = [];
         const concurrency = Math.max(1, Math.min(30, Number($("#parallelSelect").value) || 30));
         const maxAttempts = 2;
@@ -145,6 +163,7 @@ async function run() {
           }
 
           progress(5 + 3 * end / segments.length);
+          debug("Lot HLS terminé", { completed: end, total: segments.length });
         }
         await ffmpeg.writeFile("segments.txt", new TextEncoder().encode(concat.join("\n")));
         inputArgs = ["-f","concat","-safe","0","-i","segments.txt"];
@@ -161,15 +180,18 @@ async function run() {
     status.textContent = "Conversion en cours…";
     progress(0, "Conversion en cours…");
     await ffmpeg.exec([...inputArgs, "-map","0","-c","copy","-bsf:a","aac_adtstoasc","-movflags","+faststart","output.mp4"]);
+    debug("FFmpeg: commande terminée");
     const data = await ffmpeg.readFile("output.mp4");
+    debug("MP4 lu", { bytes: data.length });
     if (!data.length) throw new Error("FFmpeg n'a produit aucun fichier.");
     outputUrl = URL.createObjectURL(new Blob([data], {type:"video/mp4"}));
     download.href = outputUrl; download.download = "video.mp4"; download.hidden = false;
     progress(100, "Conversion terminée !");
     details.textContent = `MP4 prêt : ${(data.length/1048576).toFixed(1)} Mo`;
   } catch (error) {
+    debug("ERREUR", { message: error?.message || String(error), stack: error?.stack || null });
     progress(0, "Échec de la conversion.");
     details.textContent = error?.message || String(error);
-  } finally { button.disabled = false; }
+  } finally { debug("Fin du processus"); button.disabled = false; }
 }
 button.addEventListener("click", run);
