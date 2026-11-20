@@ -39,7 +39,6 @@ async function loadEngine() {
     if (timeMatch && videoDuration > 0) {
       const convertedSeconds = toSeconds(timeMatch[1]);
       progress(Math.min(99, convertedSeconds / videoDuration * 100), "Conversion en cours…");
-      percent.textContent = Math.floor(convertedSeconds) + " s / " + Math.floor(videoDuration) + " s";
     }
   });
   // Utiliser la version ESM : le worker FFmpeg peut importer le module
