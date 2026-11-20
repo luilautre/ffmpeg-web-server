@@ -83,21 +83,37 @@ async function run() {
       if (/\.m3u8(?:$|[?#])/i.test(url.href)) {
         const segments = await playlistSegments(url.href);
         const concat = [];
-        const concurrency = 6;
+        const concurrency = Math.max(1, Math.min(30, Number($("#parallelSelect").value) || 30));
+        const maxAttempts = 2;
 
-        // Télécharger un petit groupe de segments en parallèle.
-        // Les fichiers sont ensuite écrits dans l'ordre original de la playlist.
+        async function downloadSegment(segmentUrl, index) {
+          let lastError;
+          for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+              const res = await fetch(segmentUrl);
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              return new Uint8Array(await res.arrayBuffer());
+            } catch (error) {
+              lastError = error;
+              if (attempt < maxAttempts) {
+                status.textContent = `Nouvel essai pour le segment ${index + 1} (2/2)…`;
+                await new Promise(resolve => setTimeout(resolve, 400 * attempt));
+              }
+            }
+          }
+          throw new Error(`Segment ${index + 1} échoué après 2 tentatives : ${lastError?.message || lastError}`);
+        }
+
+        // Téléchargement par groupes, avec un maximum configurable de requêtes simultanées.
+        // Les segments sont écrits dans l'ordre de la playlist, même s'ils arrivent dans le désordre.
         for (let start = 0; start < segments.length; start += concurrency) {
           const end = Math.min(start + concurrency, segments.length);
           status.textContent = `Téléchargement des segments : ${end}/${segments.length} (jusqu'à ${concurrency} simultanés)`;
 
           const batch = await Promise.all(
-            segments.slice(start, end).map(async (segmentUrl, offset) => {
-              const index = start + offset;
-              const res = await fetch(segmentUrl);
-              if (!res.ok) throw new Error(`Segment ${index + 1} inaccessible : HTTP ${res.status}`);
-              return new Uint8Array(await res.arrayBuffer());
-            })
+            segments.slice(start, end).map((segmentUrl, offset) =>
+              downloadSegment(segmentUrl, start + offset)
+            )
           );
 
           for (let offset = 0; offset < batch.length; offset++) {
