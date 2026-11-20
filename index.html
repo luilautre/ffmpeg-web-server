@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101522">
+  <title>FFmpeg Web Converter</title>
+</head>
+<body>
+  <main class="app">
+    <div class="brand">FF<span>mpeg</span> <i>WEB CONVERTER</i></div>
+    <h1>Convertis tes vidéos.</h1>
+    <p class="intro">Un convertisseur MP4 qui fonctionne directement dans ton navigateur. Aucun fichier n'est envoyé sur un serveur.</p>
+    <section class="panel">
+      <label class="field-label" for="sourceUrl">URL d'une vidéo ou playlist HLS (.m3u8)</label>
+      <input id="sourceUrl" type="url" placeholder="https://serveur.exemple/video.m3u8" autocomplete="url">
+      <div class="or"><span>OU</span></div>
+      <label class="file-pick" for="sourceFile"><strong>Choisir un fichier vidéo</strong><span id="fileName">MP4, TS, MOV, WebM…</span></label>
+      <input id="sourceFile" type="file" accept="video/*,.ts,.mkv,.avi,.mov,.mp4,.webm" hidden>
+      <button id="convertBtn" type="button">Charger FFmpeg et convertir</button>
+    </section>
+    <section class="progress-wrap">
+      <div class="progress-top"><span id="status">En attente d'une vidéo.</span><span id="percent"></span></div>
+      <div class="track"><div id="bar"></div></div>
+      <pre id="details" aria-live="polite"></pre>
+      <a id="download" hidden>↓ Télécharger le MP4</a>
+    </section>
+    <p class="notice"><b>À savoir :</b> pour une URL distante, le serveur vidéo doit autoriser les requêtes CORS depuis ce site. Les playlists HLS chiffrées/DRM ne sont pas prises en charge. Les gros fichiers demandent beaucoup de mémoire et peuvent dépasser les capacités du navigateur.</p>
+    <footer>Conversion locale dans ton navigateur · Propulsé par FFmpeg.wasm</footer>
+  </main>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
