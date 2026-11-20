@@ -83,14 +83,31 @@ async function run() {
       if (/\.m3u8(?:$|[?#])/i.test(url.href)) {
         const segments = await playlistSegments(url.href);
         const concat = [];
-        for (let i = 0; i < segments.length; i++) {
-          status.textContent = `Téléchargement des segments : ${i+1}/${segments.length}`;
-          progress(5 + 3 * i / segments.length);
-          const res = await fetch(segments[i]);
-          if (!res.ok) throw new Error(`Segment ${i+1} inaccessible : HTTP ${res.status}`);
-          const name = `segment_${String(i).padStart(5,"0")}.ts`;
-          await ffmpeg.writeFile(name, new Uint8Array(await res.arrayBuffer()));
-          concat.push(`file '${name}'`);
+        const concurrency = 6;
+
+        // Télécharger un petit groupe de segments en parallèle.
+        // Les fichiers sont ensuite écrits dans l'ordre original de la playlist.
+        for (let start = 0; start < segments.length; start += concurrency) {
+          const end = Math.min(start + concurrency, segments.length);
+          status.textContent = `Téléchargement des segments : ${end}/${segments.length} (jusqu'à ${concurrency} simultanés)`;
+
+          const batch = await Promise.all(
+            segments.slice(start, end).map(async (segmentUrl, offset) => {
+              const index = start + offset;
+              const res = await fetch(segmentUrl);
+              if (!res.ok) throw new Error(`Segment ${index + 1} inaccessible : HTTP ${res.status}`);
+              return new Uint8Array(await res.arrayBuffer());
+            })
+          );
+
+          for (let offset = 0; offset < batch.length; offset++) {
+            const index = start + offset;
+            const name = `segment_${String(index).padStart(5,"0")}.ts`;
+            await ffmpeg.writeFile(name, batch[offset]);
+            concat.push(`file '${name}'`);
+          }
+
+          progress(5 + 3 * end / segments.length);
         }
         await ffmpeg.writeFile("segments.txt", new TextEncoder().encode(concat.join("\n")));
         inputArgs = ["-f","concat","-safe","0","-i","segments.txt"];
