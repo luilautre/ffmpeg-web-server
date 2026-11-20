@@ -5,7 +5,7 @@ const $ = (s) => document.querySelector(s);
 const urlInput = $("#sourceUrl"), fileInput = $("#sourceFile");
 const button = $("#convertBtn"), status = $("#status"), percent = $("#percent");
 const bar = $("#bar"), details = $("#details"), download = $("#download");
-let ffmpeg, outputUrl;
+let ffmpeg, outputUrl, videoDuration = 0;
 
 fileInput.addEventListener("change", () => {
   $("#fileName").textContent = fileInput.files[0]?.name || "MP4, TS, MOV, WebM…";
@@ -21,9 +21,8 @@ async function loadEngine() {
   if (ffmpeg) return;
   status.textContent = "Chargement de FFmpeg (~30 Mo)…";
   ffmpeg = new FFmpeg();
-  let videoDuration = 0;
   const toSeconds = (value) => {
-    const match = value.match(/^(\\d+):(\\d{2}):(\\d{2}(?:\\.\\d+)?)/);
+    const match = value.match(/^(\d+):(\d{2}):(\d{2}(?:\\.\d+)?)/);
     return match ? Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) : 0;
   };
   ffmpeg.on("log", ({ message }) => {
@@ -32,10 +31,10 @@ async function loadEngine() {
 
     // FFmpeg indique la durée totale dans les informations d'entrée,
     // puis le temps média traité dans ses lignes de progression.
-    const durationMatch = message.match(/Duration:\\s*(\\d+:\\d{2}:\\d{2}(?:\\.\\d+)?)/);
+    const durationMatch = message.match(/Duration:\s*(\d+:\d{2}:\d{2}(?:\\.\d+)?)/);
     if (durationMatch) videoDuration = toSeconds(durationMatch[1]);
 
-    const timeMatch = message.match(/time=(\\d+:\\d{2}:\\d{2}(?:\\.\\d+)?)/);
+    const timeMatch = message.match(/time=(\d+:\d{2}:\d{2}(?:\\.\d+)?)/);
     if (timeMatch && videoDuration > 0) {
       const convertedSeconds = toSeconds(timeMatch[1]);
       progress(Math.min(99, convertedSeconds / videoDuration * 100), "Conversion en cours…");
@@ -76,7 +75,11 @@ async function playlistSegments(url, depth = 0) {
     throw new Error("Playlist HLS fMP4 non prise en charge par cette version.");
   const segments = lines.filter(x => !x.startsWith("#")).map(x => new URL(x, url).href);
   if (!segments.length) throw new Error("Aucun segment vidéo dans la playlist.");
-  return segments;
+  const duration = lines.reduce((total, line) => {
+    const match = line.match(/^#EXTINF:([0-9]+(?:\\.[0-9]+)?)/);
+    return total + (match ? Number(match[1]) : 0);
+  }, 0);
+  return { segments, duration };
 }
 
 async function run() {
@@ -97,7 +100,9 @@ async function run() {
       const url = new URL(rawUrl);
       if (!["http:", "https:"].includes(url.protocol)) throw new Error("Seules les URL HTTP(S) sont acceptées.");
       if (/\.m3u8(?:$|[?#])/i.test(url.href)) {
-        const segments = await playlistSegments(url.href);
+        const playlist = await playlistSegments(url.href);
+        const segments = playlist.segments;
+        videoDuration = playlist.duration;
         const concat = [];
         const concurrency = Math.max(1, Math.min(30, Number($("#parallelSelect").value) || 30));
         const maxAttempts = 2;
