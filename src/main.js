@@ -21,9 +21,26 @@ async function loadEngine() {
   if (ffmpeg) return;
   status.textContent = "Chargement de FFmpeg (~30 Mo)…";
   ffmpeg = new FFmpeg();
-  ffmpeg.on("log", ({ message }) => { if (message) details.textContent = message.slice(-1600); });
-  ffmpeg.on("progress", ({ progress: p }) => {
-    if (Number.isFinite(p)) progress(8 + p * 86, "Conversion en cours…");
+  let videoDuration = 0;
+  const toSeconds = (value) => {
+    const match = value.match(/^(\\d+):(\\d{2}):(\\d{2}(?:\\.\\d+)?)/);
+    return match ? Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) : 0;
+  };
+  ffmpeg.on("log", ({ message }) => {
+    if (!message) return;
+    details.textContent = (details.textContent + "\\n" + message).slice(-1600);
+
+    // FFmpeg indique la durée totale dans les informations d'entrée,
+    // puis le temps média traité dans ses lignes de progression.
+    const durationMatch = message.match(/Duration:\\s*(\\d+:\\d{2}:\\d{2}(?:\\.\\d+)?)/);
+    if (durationMatch) videoDuration = toSeconds(durationMatch[1]);
+
+    const timeMatch = message.match(/time=(\\d+:\\d{2}:\\d{2}(?:\\.\\d+)?)/);
+    if (timeMatch && videoDuration > 0) {
+      const convertedSeconds = toSeconds(timeMatch[1]);
+      progress(Math.min(99, convertedSeconds / videoDuration * 100), "Conversion en cours…");
+      percent.textContent = Math.floor(convertedSeconds) + " s / " + Math.floor(videoDuration) + " s";
+    }
   });
   // Utiliser la version ESM : le worker FFmpeg peut importer le module
   // directement depuis le CDN. Les URL blob provoquaient l'erreur
@@ -66,7 +83,7 @@ async function playlistSegments(url, depth = 0) {
 async function run() {
   button.disabled = true; download.hidden = true; details.textContent = "";
   if (outputUrl) URL.revokeObjectURL(outputUrl);
-  progress(1, "Préparation…");
+  progress(0, "Préparation…");
   try {
     const file = fileInput.files[0];
     const rawUrl = urlInput.value.trim();
@@ -137,7 +154,8 @@ async function run() {
         inputArgs = ["-i", name];
       }
     }
-    status.textContent = "Création du MP4…";
+    status.textContent = "Conversion en cours…";
+    progress(0, "Conversion en cours…");
     await ffmpeg.exec([...inputArgs, "-map","0","-c","copy","-bsf:a","aac_adtstoasc","-movflags","+faststart","output.mp4"]);
     const data = await ffmpeg.readFile("output.mp4");
     if (!data.length) throw new Error("FFmpeg n'a produit aucun fichier.");
