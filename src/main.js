@@ -22,7 +22,7 @@ async function loadEngine() {
   status.textContent = "Chargement de FFmpeg (~30 Mo)…";
   ffmpeg = new FFmpeg();
   const toSeconds = (value) => {
-    const match = value.match(/^(\d+):(\d{2}):(\d{2}(?:\\.\d+)?)/);
+    const match = value.match(/^(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/);
     return match ? Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) : 0;
   };
   ffmpeg.on("log", ({ message }) => {
@@ -31,10 +31,10 @@ async function loadEngine() {
 
     // FFmpeg indique la durée totale dans les informations d'entrée,
     // puis le temps média traité dans ses lignes de progression.
-    const durationMatch = message.match(/Duration:\s*(\d+:\d{2}:\d{2}(?:\\.\d+)?)/);
+    const durationMatch = message.match(/Duration:\s*(\d+:\d{2}:\d{2}(?:\.\d+)?)/);
     if (durationMatch) videoDuration = toSeconds(durationMatch[1]);
 
-    const timeMatch = message.match(/time=(\d+:\d{2}:\d{2}(?:\\.\d+)?)/);
+    const timeMatch = message.match(/time=(\d+:\d{2}:\d{2}(?:\.\d+)?)/);
     if (timeMatch && videoDuration > 0) {
       const convertedSeconds = toSeconds(timeMatch[1]);
       progress(Math.min(99, convertedSeconds / videoDuration * 100), "Conversion en cours…");
@@ -76,7 +76,7 @@ async function playlistSegments(url, depth = 0) {
   const segments = lines.filter(x => !x.startsWith("#")).map(x => new URL(x, url).href);
   if (!segments.length) throw new Error("Aucun segment vidéo dans la playlist.");
   const duration = lines.reduce((total, line) => {
-    const match = line.match(/^#EXTINF:([0-9]+(?:\\.[0-9]+)?)/);
+    const match = line.match(/^#EXTINF:([0-9]+(?:\.[0-9]+)?)/);
     return total + (match ? Number(match[1]) : 0);
   }, 0);
   return { segments, duration };
