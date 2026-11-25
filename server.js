@@ -51,8 +51,8 @@ function publicJob(job) {
 function serveStatic(req, res) {
   const pathname = new URL(req.url, `http://${HOST}:${PORT}`).pathname;
   const files = {
-    "/": ["index.html", "text/html; charset=utf-8"],
-    "/index.html": ["index.html", "text/html; charset=utf-8"]
+    "/": ["public/index.html", "text/html; charset=utf-8"],
+    "/index.html": ["public/index.html", "text/html; charset=utf-8"]
   };
   const item = files[pathname];
   if (!item) return send(res, 404, "Introuvable.", "text/plain; charset=utf-8");
